@@ -1,0 +1,122 @@
+module pd_dw_nr_inf (
+	input	sys_clk,	//491.52M
+	input	sys_rst,
+	
+	//i_sel:
+	//7.68		x64
+	//15.36		x32
+	//30.72		x16
+	//61.44		x8
+	//122.88	x4
+	input	[ 3:0]	i_sel,
+
+	input			i_fram,
+	output			o_last
+);
+
+//basic parameter
+reg		[ 3:0]	xant_max = 4'd0;
+reg		[12:0]	spec_symbol_len = 12'd0;
+reg		[12:0]	norm_symbol_len = 12'd0;
+
+reg		[ 3:0]	xant_cnt = 4'd0;
+reg		[12:0]	symb_point_cnt = 12'd0;
+reg		[12:0]	symb_point_max = 12'd0;
+reg		[ 3:0]	symb_cnt = 4'd0;
+
+reg				symb_last = 1'b0;
+
+always @ (posedge sys_clk) begin
+	case(i_sel)
+		4'h2:	xant_max <= 4'd15;
+		4'h3:	xant_max <= 4'd15;
+		4'h4:	xant_max <= 4'd7;
+		4'h5:	xant_max <= 4'd7;
+		4'h6:	xant_max <= 4'd7;
+		4'h8:	xant_max <= 4'd3;
+		4'h9:	xant_max <= 4'd3;
+		4'hA:	xant_max <= 4'd3;
+		default:xant_max <= 4'd3;
+	endcase
+end
+
+always @ (posedge sys_clk) begin
+	case(i_sel)
+		4'h2:	spec_symbol_len <= (13'd1024 + 13'd88 ) - 1;
+		4'h3:	spec_symbol_len <= (13'd1024 + 13'd88 ) - 1;
+		4'h4:	spec_symbol_len <= (13'd2048 + 13'd176) - 1;
+		4'h5:	spec_symbol_len <= (13'd2048 + 13'd176) - 1;
+		4'h6:	spec_symbol_len <= (13'd2048 + 13'd176) - 1;
+		4'h8:	spec_symbol_len <= (13'd4096 + 13'd352) - 1;
+		4'h9:	spec_symbol_len <= (13'd4096 + 13'd352) - 1;
+		4'hA:	spec_symbol_len <= (13'd4096 + 13'd352) - 1;
+		default:spec_symbol_len <= (13'd4096 + 13'd352) - 1;
+	endcase
+end
+
+always @ (posedge sys_clk) begin
+	case(i_sel)
+		4'h2:	norm_symbol_len <= (13'd1024 + 13'd72 ) - 1;
+		4'h3:	norm_symbol_len <= (13'd1024 + 13'd72 ) - 1;
+		4'h4:	norm_symbol_len <= (13'd2048 + 13'd144) - 1;
+		4'h5:	norm_symbol_len <= (13'd2048 + 13'd144) - 1;
+		4'h6:	norm_symbol_len <= (13'd2048 + 13'd144) - 1;	
+		4'h8:	norm_symbol_len <= (13'd4096 + 13'd288) - 1;
+		4'h9:	norm_symbol_len <= (13'd4096 + 13'd288) - 1;
+		4'hA:	norm_symbol_len <= (13'd4096 + 13'd288) - 1;
+		default:norm_symbol_len <= (13'd4096 + 13'd288) - 1;
+	endcase
+end
+
+always @ (posedge sys_clk) begin
+	if(i_fram)
+		xant_cnt <= 4'd0;
+	else if(xant_cnt == xant_max)
+		xant_cnt <= 4'd0;
+	else
+		xant_cnt <= xant_cnt + 4'd1;
+end
+
+always @ (*) begin
+	if(symb_cnt == 4'd0)
+		symb_point_max = spec_symbol_len;
+	else
+		symb_point_max = norm_symbol_len;
+end
+
+always @ (posedge sys_clk) begin
+	if(i_fram)
+		symb_point_cnt <= 13'd0;
+	else if((symb_point_cnt == symb_point_max) && (xant_cnt == xant_max))
+		symb_point_cnt <= 13'd0;
+	else if(xant_cnt == xant_max)
+		symb_point_cnt <= symb_point_cnt + 13'd1;
+	else
+		symb_point_cnt <= symb_point_cnt;
+end
+
+always @ (posedge sys_clk) begin
+	if(i_fram)
+		symb_cnt <= 4'd0;
+	else if((symb_cnt == 4'd13) && (symb_point_cnt == symb_point_max) && (xant_cnt == xant_max))
+		symb_cnt <= 4'd0;
+	else if((symb_point_cnt == symb_point_max) && (xant_cnt == xant_max))
+		symb_cnt <= symb_cnt + 4'd1;
+	else
+		symb_cnt <= symb_cnt;
+end
+
+always @ (posedge sys_clk) begin
+	if(i_fram)
+		symb_last <= 1'b0;
+	else if((symb_point_cnt == symb_point_max - 1) && (xant_cnt == xant_max))
+		symb_last <= 1'b1;
+	else if(xant_cnt == 4'd3)
+		symb_last <= 1'b0;
+	else
+		symb_last <= symb_last;
+end
+
+assign o_last = symb_last;
+
+endmodule
